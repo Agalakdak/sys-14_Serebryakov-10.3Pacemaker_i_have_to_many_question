@@ -1,0 +1,80 @@
+---
+- name: PlayBook_drbd
+  hosts: servers
+  become: yes
+
+  tasks:
+  - name: "Update apt cache"
+    apt:
+      update_cache: true
+
+  - name: Install drbd
+    apt:
+      name: drbd-utils
+      state: present
+
+  - name: Instert drbd in etc modules
+    shell:
+      echo "drbd" >> /dev/null
+
+  - name: Modprobe on
+    shell:
+      modprobe drbd
+#---
+#---
+
+  - name: install lvm2
+    apt:
+      name: lvm2
+      state: present
+
+  - name: Make pvcreate
+    shell:
+      pvcreate /dev/vdb
+
+  - name: Make vgcreate
+    shell:
+      vgcreate vg0 /dev/vdb
+
+  - name: Make lvcreate www
+    shell:
+      lvcreate -L3G -n www vg0
+
+  - name: Make lvcreate mysql
+    shell:
+      lvcreate -L3G -n mysql vg0
+
+
+
+  - name: Create www.res files
+    ansible.builtin.template:
+      src: /home/sir/ansible/www.res
+      dest: /etc/drbd.d/www.res
+      owner: root
+      group: root
+      mode: 0777
+
+  - name: Create mysql.res
+    ansible.builtin.template:
+      src: /home/sir/ansible/mysql.res
+      dest: /etc/drbd.d/mysql.res
+      owner: root
+      group: root
+      mode: 0777
+
+  - name: Activate www.res and mysql.res
+    shell:
+      drbdadm create-md www
+      drbdadm create-md mysql
+
+#пробуем работать только на мастере
+- name: Activate .res files
+  hosts: master
+  become: yes
+
+  tasks:
+  - name: Activate.res files
+    shell:
+      drbdadm primary --force www
+      drbdadm primary --force mysql
+...
